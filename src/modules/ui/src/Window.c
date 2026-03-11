@@ -15,6 +15,7 @@
 #include <windowsx.h>
 #include <dwmapi.h>
 #include "DarkMode.h"
+#include "Task.h"
 
 luart_type TWindow;
 
@@ -213,14 +214,15 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam) {
 					lua_callevent(w, onMove);
 				if (!(((WINDOWPOS*)lParam)->flags & SWP_NOSIZE))					
 					lua_callevent(w, onResize);
+					update_tasks(uitask->L);
 				break;
-
-			case WM_WINDOWPOSCHANGED:
-				if (w->status) {
-					RECT r;
-					GetClientRect(hWnd, &r);
-					SendMessage(w->status, WM_SIZE, 0, MAKELPARAM(r.right, r.bottom));
-				}
+      case WM_ENTERSIZEMOVE:
+          SetTimer(hWnd, 1, 15, NULL);
+          break;
+      case WM_EXITSIZEMOVE:
+          KillTimer(hWnd, 1);
+          break;
+      case WM_WINDOWPOSCHANGED:
 				flags = ((WINDOWPOS*)lParam)->flags;
 				if (flags & SWP_HIDEWINDOW)
 					lua_callevent(w, onHide);
@@ -304,9 +306,16 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam) {
 
 			case WM_SIZING:
 			    EnumChildWindows(hWnd, ResizeChilds, (LPARAM)hWnd);
-				break;
-
-            case WM_SETCURSOR:
+          /* make sure tasks keep running while user is resizing */
+          if (uitask)
+              update_tasks(uitask->L);
+          break;
+      case WM_MOVING:
+          /* dragging the window happens inside a modal loop too */
+          if (uitask)
+              update_tasks(uitask->L);
+          break;
+      case WM_SETCURSOR:
 				if (LOWORD(lParam) == HTCLIENT) {
 					POINT p;
 					GetCursorPos(&p);
@@ -317,7 +326,11 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam) {
 					}
 				}
 				break;
-			case WM_APP:
+			case WM_TIMER:
+          if (wParam == 1 && uitask)
+              update_tasks(uitask->L);
+          break;
+      case WM_APP:
 				switch (LOWORD(lParam)) {				
 					case WM_RBUTTONUP:		lua_callevent(w, onTrayContext);
 											break;
@@ -373,8 +386,8 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam) {
 			case WM_NCCALCSIZE: if (w->style == WS_OVERLAPPEDWINDOW)
 									return 0;
 		}
-	}
-	return DefWindowProc(hWnd, Msg, wParam, lParam);
+  }
+  return DefWindowProc(hWnd, Msg, wParam, lParam);
 }
 
 static const char *styles[] = {  "dialog", "fixed", "float", "raw", "single", NULL };

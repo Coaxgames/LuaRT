@@ -39,6 +39,7 @@ extern const char *cursors[], *luart_wtypes[], *events[];
 extern HBRUSH DARK_BRUSH;
 extern HBRUSH CBDARK_BRUSH;
 extern Widget *main;
+extern Task *uitask;
 
 #define NCURSORS 14
 static const PSTR cursors_values[] = {
