@@ -36,6 +36,10 @@ static UIInterface ui_interface;
 static Task *uitask;
 Widget *main = NULL;
 
+// ui.c — NO static keyword
+BOOL g_isDragging = FALSE;
+lua_State *g_L = NULL;
+
 static HMODULE richeditlib;
 int UIWindow;
 int UIButton;
@@ -760,11 +764,14 @@ static int RunTaskContinue(lua_State* L, int status, lua_KContext ctx) {
 	return (ctx && IsWindowVisible(((Widget*)ctx)->handle)) ? lua_yieldk(L, 0, ctx, RunTaskContinue) : 0;
 }
 
+//NOTE: also related to UI task startup/Running
 static int UITaskContinue(lua_State* L, int status, lua_KContext ctx) {
-	do_update(L);
+	do_update(L); //Not 100% sure what this is doing, looks like we just process pending UI messages while the task is running, if this is where we are getting locked up
+	//then it would makes sense to yeild every 16ms (60FPS) instead of every time we process a message, This should allow lua to run under the modal loop (maybe? bc win still LOCKS the userinput during that time, so timer?)
 	return uitask->status < TTerminated ? lua_yieldk(L, 0, ctx, UITaskContinue) : 0;
 }
 
+//NOTE: also related to UI task startup/Running
 LUA_METHOD(ui, run) {
 	Widget *w = check_widget(L, 1, UIWindow);
 
@@ -1350,12 +1357,15 @@ END
 
 /* ------------------------------------------------------------------------ */
 int __declspec(dllexport)  luaopen_ui(lua_State *L) {
+	g_L = L;
 	WNDCLASSEX wcex = {0};
 	DWORD dwLayout;
 	int i = -1;
 
 	InitDarkMode();
 	HRESULT hr = OleInitialize(NULL);
+
+	//this task needs to made into its own thread
 	uitask = lua_pushtask(L, UITaskContinue, NULL, NULL);
 
 	wcex.cbSize = sizeof(WNDCLASSEX);
