@@ -761,18 +761,16 @@ LUA_PROPERTY_SET(ui, mainWindow) {
 	return 0;
 }
 
+//NOTE: also related to UI task startup/Running, yieldk allows C to safely return here, and seems like here only
 static int RunTaskContinue(lua_State* L, int status, lua_KContext ctx) {
 	return (ctx && IsWindowVisible(((Widget*)ctx)->handle)) ? lua_yieldk(L, 0, ctx, RunTaskContinue) : 0;
 }
-
-//NOTE: also related to UI task startup/Running
 static int UITaskContinue(lua_State* L, int status, lua_KContext ctx) {
-	do_update(L); //this and UITaskContinue would be WHERE we lock up, do_update is the src for callbacks from loop
-	//then it would makes sense to yeild every 16ms (60FPS) instead of every time we process a message, This should allow lua to run under the modal loop (maybe? bc win still LOCKS the userinput during that time, so timer?)
+	do_update(L); //this function is i *think* where we get hijacked by w32 modal loop
 	return uitask->status < TTerminated ? lua_yieldk(L, 0, ctx, UITaskContinue) : 0;
 }
 
-//NOTE: also related to UI task startup/Running
+//NOTE: Lua sided way for users to start the UI task, but using th main window
 LUA_METHOD(ui, run) {
 	Widget *w = check_widget(L, 1, UIWindow);
 
