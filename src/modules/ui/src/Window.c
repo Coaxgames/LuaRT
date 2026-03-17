@@ -219,7 +219,8 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam) {
 			case WM_MOVING:
     		EnumChildWindows(hWnd, ResizeChilds, (LPARAM)hWnd);
     		if (g_L)
-    		    do_update(g_L);          // pump tasks during drag modal loop
+    		   // do_update(g_L); //this just recalls, this loop is the modal loop that windows "hijacks"
+					 //Even if i break, we just return right back EVEN without windows hijacking the app
     		break;
 			case WM_WINDOWPOSCHANGED:
 				if (w->status) {

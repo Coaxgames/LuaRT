@@ -729,6 +729,7 @@ dispatch:	DispatchMessage(&msg);
 	return TRUE;
 }
 
+//runs the ui Modal callback loop?
 LUA_METHOD(ui, update) {
 	return do_update(L);
 }
@@ -766,7 +767,7 @@ static int RunTaskContinue(lua_State* L, int status, lua_KContext ctx) {
 
 //NOTE: also related to UI task startup/Running
 static int UITaskContinue(lua_State* L, int status, lua_KContext ctx) {
-	do_update(L); //Not 100% sure what this is doing, looks like we just process pending UI messages while the task is running, if this is where we are getting locked up
+	do_update(L); //this and UITaskContinue would be WHERE we lock up, do_update is the src for callbacks from loop
 	//then it would makes sense to yeild every 16ms (60FPS) instead of every time we process a message, This should allow lua to run under the modal loop (maybe? bc win still LOCKS the userinput during that time, so timer?)
 	return uitask->status < TTerminated ? lua_yieldk(L, 0, ctx, UITaskContinue) : 0;
 }
