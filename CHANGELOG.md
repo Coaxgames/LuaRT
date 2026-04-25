@@ -446,6 +446,7 @@
 - Fixed: `COM` objects methods now uses more than one argument (Fixes #205)
 
 #### `console` module
+- New: `console.maximize()` function and `console.maximized` property.  (Pull-R #253)
 - Fixed: Using an unknown color with `console.bgcolor`, `console.color`, `console.clear()` and `console.writecolor()` won't crash anymore (Fixes #211)
 - Fixed: `Console.x` and `Console.y` properties now return a correct cursor position (Fixes #212)
 

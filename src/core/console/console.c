@@ -381,6 +381,13 @@ LUA_METHOD(console, hide) {
 	return 0;
 }
 
+LUA_METHOD(console, maximize) {
+	HWND hwnd = GetConsoleWindow();
+	BOOL isMaximized = IsZoomed(hwnd);
+	ShowWindow(hwnd, isMaximized ? SW_RESTORE : SW_MAXIMIZE);
+	return 0;
+}
+
 LUA_PROPERTY_GET(console, visible) {
 	lua_pushboolean(L, IsWindowVisible(GetConsoleWindow()));
 	return 1;
@@ -413,6 +420,19 @@ LUA_PROPERTY_SET(console, fullscreen) {
 
 LUA_API int fontsize_fromheight(int height) {
 	return height < 0 ? MulDiv(-height, 72, GetDeviceCaps(GetDC(0), LOGPIXELSY)) : height;
+}
+
+LUA_PROPERTY_GET(console, maximized) {
+	HWND hwnd = GetConsoleWindow();
+	lua_pushboolean(L, IsZoomed(hwnd));
+	return 1;
+}
+
+LUA_PROPERTY_SET(console, maximized) {
+	HWND hwnd = GetConsoleWindow();
+	BOOL value = lua_toboolean(L, 1);
+	ShowWindow(hwnd, value ? SW_MAXIMIZE : SW_RESTORE);
+	return 0;
 }
 
 LUA_PROPERTY_GET(console, font) {
@@ -520,6 +540,7 @@ MODULE_FUNCTIONS(console)
 	METHOD(console, locate)
 	METHOD(console, show)
 	METHOD(console, hide)
+	METHOD(console, maximize)
 END
 
 MODULE_PROPERTIES(console)
