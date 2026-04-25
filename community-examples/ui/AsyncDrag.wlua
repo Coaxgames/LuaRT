@@ -70,14 +70,15 @@ end
 --## Task example + UI drag task
 --a task to handle moving the window, using tasks rather than win11 message loop
 local MovUI, IsDrag = sys.Task(function (Button, buttons)
+  px, py = ui.mousepos()
   while true do
-    if not IsHovering(Button) then--may switch this to only the main window
+    if not IsHovering(Button) then--this is choppy, but does make dropping ore reliable
       x, y = ui.mousepos()
-      ui.update()
-      win.x = (x) - (Button.x+2) --this adjusts the grab location to where the label exists
-      win.y = (y) - (Button.y+5) --offset for buttons and topbar's size
+      win.x = (x) - (Button.x+2 + (math.abs(px-x)*6))  --this adjusts the grab location to where the label exists
+      win.y = (y) - (Button.y+5 + (math.abs(py-y)*6))  --abs and prev pos is used for acceleration prediction (helps with onHover registering better)
     end
-    sleep(3)
+    sleep(4)
+    px, py = ui.mousepos()
   end
 end), false
 
@@ -85,9 +86,9 @@ end), false
 local BackroundTask = sys.Task(function ()
   while true do
     --print("RUNNING")
-    x, y = ui.mousepos()
-    win:status(win.x, win.y, "MOUSE: ", x,y)
-    sleep(16)
+    --x, y = ui.mousepos()
+    --win:status(win.x, win.y, "MOUSE: ", x,y) --running this DOES make the ui a bit more laggy. best to update every 16~60ms rather than 8ms
+    sleep(8)
     ui.update()
   end
 end)
