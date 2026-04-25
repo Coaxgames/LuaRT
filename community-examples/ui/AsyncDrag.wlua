@@ -1,18 +1,20 @@
-/*
-## ** Async Drag Example **
- Ever annoyed about your app freezing when dragging the UI around, Avoiding a painfull flashbang when moving ui's around with dark mode?
 
-# WELL i have just the spitefull solution for you, this example displays;
- ~A Small foundation for a TopBar replacment, Allowing for a sleeker looking borderless(mostly) window
- ~The new TaskFactory system, an awesome solution so tasks randomly stopping after some time!
- ~Async Tasks WHILE dragging a UI around, and customizable Drag logic
- ~OnHover animation with predefined colors
-Made by Xaon420
-*/
+-- ## ** Async Drag Example **
+--  Ever annoyed about your app freezing when dragging the UI around, Avoiding a painfull flashbang when moving ui's around with dark mode?
+-- 
+-- # WELL i have just the spitefull solution for you, this example displays;
+--  ~A Small foundation for a TopBar replacment, Allowing for a sleeker looking borderless(mostly) window
+--  ~The new TaskFactory system, an awesome solution so tasks randomly stopping after some time!
+--  ~Async Tasks WHILE dragging a UI around, and customizable Drag logic
+--  ~OnHover animation with predefined colors
+
+-- Rev 1, Rev 2 will be a bug fix and drop soon (Fixing some oddball issues and the hover system)
+-- Made by Xaon420
 
 
 local ui = require("ui")
 
+local LOffset = 6 --an offset for all elements bound to the left side
 local colors = {--predefined colors for switching/preloading a color
   TopBarColor = 0x070707,
   ButtonColor = 0x060606,
@@ -86,6 +88,7 @@ local BackroundTask = sys.Task(function ()
     x, y = ui.mousepos()
     win:status(win.x, win.y, "MOUSE: ", x,y)
     sleep(16)
+    ui.update()
   end
 end)
   
@@ -127,11 +130,14 @@ end
 
 
 --## Hover events, if hovering on another element then another may be ignored
+function CloseLB:onHover(x, y, buttons) --required, updates Drag task status and catches edge cases in the ui hover system
+  OnHov(CloseLB, x, y, buttons, true)
+end
 function MoveLB:onHover(x, y, buttons) --required, updates Drag task status and catches edge cases in the ui hover system
   OnHov(MoveLB, x, y, buttons, true)
 end
 function TopBar:onHover(x, y, buttons) --required, updates Drag task status and catches edge cases in the ui hover system
-  OnHov(MoveLB, x, y, buttons, true)
+  OnHov(TopBar, x, y, buttons) --apply but DO NOT animate, this is bugged currently but the color will not revert
 end
 function MoveLB:onMouseUp(b, x, y) --Added in preferance from OnHover and OnLeave with button checks
   IsDrag = false
