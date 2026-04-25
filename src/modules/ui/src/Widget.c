@@ -131,7 +131,9 @@ INT_PTR widget_setcolors(Widget *w, HDC dc, HWND h)
 		SetBkMode(dc, TRANSPARENT);
 		SetTextColor(dc, c->color);
 		if (c->brush)
-			return (INT_PTR)c->brush;
+			return (INT_PTR)c->brush;	
+		if (c->wtype != UIWindow)
+			return (INT_PTR)GetStockBrush(NULL_BRUSH);
 		if (w->brush)
 			return (INT_PTR)w->brush;
 	}
