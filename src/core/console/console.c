@@ -15,8 +15,6 @@
 #include <windows.h>
 #include <winuser.h>
 #include <io.h>
-#include <string.h>
-#include <Task.h>
 
 
 /* ------------------------------------------------------------------------ */
@@ -530,13 +528,10 @@ LUA_PROPERTY_GET(console, cursor) {
 
 MODULE_FUNCTIONS(console)
 	METHOD(console, read)
-	METHOD(console, read_async)
 	METHOD(console, readchar)
-	METHOD(console, readchar_async)
 	METHOD(console, readmouse)
 	METHOD(console, clear)
 	METHOD(console, readln)
-	METHOD(console, readln_async)
 	METHOD(console, write)
 	METHOD(console, writeln)
 	METHOD(console, writecolor)
@@ -566,149 +561,7 @@ MODULE_PROPERTIES(console)
 	READWRITE_PROPERTY(console, fontsize)
 	READWRITE_PROPERTY(console, cursor)
 	READWRITE_PROPERTY(console, visible)
-	READONLY_PROPERTY(console, async)
 END
-
-typedef struct {
-	HANDLE thread;
-	HANDLE h;
-	wchar_t *buf;
-	DWORD chars; /* number of wchar_t to read or 0 for line */
-	int err;
-	char *errmsg;
-} asyncConsole;
-
-static int ConsoleTask_gc(lua_State *L) {
-	asyncConsole *ac = (asyncConsole*)lua_self(L, 1, Task)->userdata;
-	if (ac) {
-		CloseHandle(ac->thread);
-		free(ac->buf);
-		free(ac);
-	}
-	return 0;
-}
-
-static int ConsoleTaskContinue(lua_State* L, int status, lua_KContext ctx) {
-	asyncConsole *ac = (asyncConsole*)ctx;
-	DWORD ret = 0;
-	if (WaitForSingleObject(ac->thread, 0) == WAIT_OBJECT_0) {
-		GetExitCodeThread(ac->thread, &ret);
-		if (ac->err) {
-			char *msg = ac->errmsg ? ac->errmsg : "console read interrupted";
-			luaL_error(L, "%s", msg);
-			return 0; /* unreachable, luaL_error longjmps */
-		}
-		if (ac->buf && wcslen(ac->buf)) {
-			lua_pushlwstring(L, ac->buf, (int)wcslen(ac->buf));
-		} else {
-			lua_pushstring(L, "");
-		}
-		return 1;
-	}
-	return lua_yieldk(L, 0, ctx, ConsoleTaskContinue);
-}
-
-static void push_ConsoleTask(lua_State *L, asyncConsole *ac, LPTHREAD_START_ROUTINE thread) {
-	lua_pushtask(L, ConsoleTaskContinue, ac, ConsoleTask_gc);
-	lua_pushvalue(L, -1);
-	if ((ac->thread = CreateThread(NULL, 0, thread, ac, 0, NULL)))
-		lua_call(L, 0, 0);
-	else luaL_error(L, "async error : could not create thread");
-}
-
-static DWORD __stdcall ReadLineThread(LPVOID data) {
-	asyncConsole *ac = (asyncConsole*)data;
-	DWORD read = 0, written = 0;
-	wchar_t ch;
-	size_t pos = 0;
-	DWORD mode = 0, savemode = 0;
-	BOOL redirected = (GetConsoleMode(ac->h, &mode) == FALSE);
-	if (!redirected) {
-		savemode = mode;
-		SetConsoleMode(ac->h, mode & ~ENABLE_LINE_INPUT & ~ENABLE_PROCESSED_INPUT & ~ENABLE_ECHO_INPUT );
-	}
-	ac->buf = calloc(4096, sizeof(wchar_t));
-	while (TRUE) {
-		if (!redirected) {
-			if (!ReadConsoleW(ac->h, &ch, 1, &read, NULL) || !read) break;
-		} else {
-			if (!ReadFile(ac->h, &ch, sizeof(wchar_t), &read, NULL) || !read) break;
-		}
-		if (ch == 3) { /* Ctrl-C */
-			ac->err = 1;
-			ac->errmsg = _strdup("^C");
-			break;
-		}
-		if (ch == L'\r' || ch == L'\n')
-			break;
-		if (ch == 8) { /* backspace */
-			if (pos > 0) {
-				pos--;
-				if (std)
-					WriteConsoleW(std, L"\b \b", 3, &written, NULL);
-			}
-			continue;
-		}
-		if (echochar) {
-			wchar_t echo = echochar;
-			if (std)
-				WriteConsoleW(std, &echo, 1, &written, NULL);
-		} else if (ch > 31) {
-			if (std)
-				WriteConsoleW(std, &ch, 1, &written, NULL);
-		}
-		ac->buf[pos++] = ch;
-		if (pos >= 4095) break;
-	}
-	ac->buf[pos] = 0;
-	if (!redirected)
-		SetConsoleMode(ac->h, savemode);
-	return 0;
-}
-
-static DWORD __stdcall ReadCharsThread(LPVOID data) {
-	asyncConsole *ac = (asyncConsole*)data;
-	DWORD read = 0;
-	ac->buf = calloc(ac->chars + 1, sizeof(wchar_t));
-	ReadConsoleW(ac->h, ac->buf, ac->chars, &read, NULL);
-	ac->buf[read] = 0;
-	return 0;
-}
-
-LUA_METHOD(console, read_async) {
-	int n = luaL_optinteger(L, 1, 1);
-	asyncConsole *ac = calloc(1, sizeof(asyncConsole));
-	ac->h = GetStdHandle(STD_INPUT_HANDLE);
-	ac->chars = n;
-	push_ConsoleTask(L, ac, ReadCharsThread);
-	return 1;
-}
-
-LUA_METHOD(console, readln_async) {
-	asyncConsole *ac = calloc(1, sizeof(asyncConsole));
-	ac->h = GetStdHandle(STD_INPUT_HANDLE);
-	push_ConsoleTask(L, ac, ReadLineThread);
-	return 1;
-}
-
-LUA_METHOD(console, readchar_async) {
-	asyncConsole *ac = calloc(1, sizeof(asyncConsole));
-	ac->h = GetStdHandle(STD_INPUT_HANDLE);
-	ac->chars = 1;
-	push_ConsoleTask(L, ac, ReadCharsThread);
-	return 1;
-}
-
-LUA_PROPERTY_GET(console, async) {
-	lua_newtable(L);
-	lua_pushcfunction(L, console_read_async);
-	lua_setfield(L, -2, "read");
-	lua_pushcfunction(L, console_readln_async);
-	lua_setfield(L, -2, "readln");
-	lua_pushcfunction(L, console_readchar_async);
-	lua_setfield(L, -2, "readchar");
-	return 1;
-}
 
 int create_stdfile(lua_State *L, FILE *f, wchar_t *name, int mode) {
 	File *F;
